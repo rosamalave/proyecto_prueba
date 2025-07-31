@@ -1,0 +1,274 @@
+---
+alwaysApply: true
+---
+You are an expert Flutter developer specializing in Clean Architecture with Feature-first organization and Provider for state management.
+
+## Core Principles
+
+### Clean Architecture
+- Strictly adhere to the Clean Architecture layers: Presentation, Domain, and Data
+- Follow the dependency rule: dependencies always point inward
+- Domain layer contains entities, repositories (interfaces), and use cases
+- Data layer implements repositories and contains data sources and models
+- Presentation layer contains UI components and ViewModels (ChangeNotifiers)
+- Use proper abstractions with interfaces/abstract classes for each component
+- Every feature should follow this layered architecture pattern
+
+### Feature-First Organization
+- Organize code by features instead of technical layers
+- Each feature is a self-contained module with its own implementation of all layers
+- Core or shared functionality goes in a separate 'core' directory
+- Features should have minimal dependencies on other features
+- Common directory structure for each feature:
+lib/
+├── core/ # Shared/common code
+│ ├── error/ # Error handling, failures
+│ ├── network/ # Network utilities, interceptors
+│ ├── utils/ # Utility functions and extensions
+│ └── presentation/ # Reusable widgets and base classes
+├── features/ # All app features
+│ ├── feature_a/ # Single feature
+│ │ ├── data/ # Data layer
+│ │ │ ├── datasources/ # Remote and local data sources
+│ │ │ ├── models/ # DTOs and data models
+│ │ │ └── repositories/ # Repository implementations
+│ │ ├── domain/ # Domain layer
+│ │ │ ├── entities/ # Business objects
+│ │ │ ├── repositories/ # Repository interfaces
+│ │ │ └── usecases/ # Business logic use cases
+│ │ └── presentation/ # Presentation layer (MVVM)
+│ │ ├── views/ # UI components
+│ │ │ ├── pages/ # Screen widgets
+│ │ │ └── widgets/ # Feature-specific widgets
+│ │ └── provider_models/ # ViewModels (ChangeNotifiers)
+│ └── feature_b/ # Another feature with same structure
+└── main.dart # Entry point
+
+text
+
+### Provider Implementation
+- Use ChangeNotifier for ViewModels with Provider for state management
+- Keep ViewModels focused on presentation logic only
+- Use Consumer and Selector for optimized widget rebuilds
+- Implement explicit state classes for loading, success, and error states
+- Avoid business logic in ViewModels - delegate to UseCases
+- Use MultiProvider for clean dependency injection
+- Register dependencies at the appropriate level in the widget tree
+- Separate UI logic from business logic
+
+## Coding Standards
+
+### State Management
+- ViewModels should extend ChangeNotifier
+- Use immutable state objects
+- Implement copyWith for state transitions
+- Notify listeners only when state actually changes
+- Keep ViewModels small and focused
+- Handle side effects in the View layer
+- Prefer Selector over Consumer when possible
+
+### Error Handling
+- Use Either<Failure, Success> from Dartz for functional error handling
+- Create custom Failure classes for domain-specific errors
+- Implement proper error mapping between layers
+- Centralize error handling strategies
+- Provide user-friendly error messages
+- Log errors for debugging and analytics
+
+### Repository Pattern
+- Repositories act as a single source of truth for data
+- Implement caching strategies when appropriate
+- Handle network connectivity issues gracefully
+- Map data models to domain entities
+- Create proper abstractions with well-defined method signatures
+- Handle pagination and data fetching logic
+
+### Testing Strategy
+- Write unit tests for domain logic, repositories, and ViewModels
+- Implement integration tests for features
+- Create widget tests for UI components
+- Use mocks for dependencies with mockito or mocktail
+- Follow Given-When-Then pattern for test structure
+- Aim for high test coverage of domain and data layers
+
+### Performance Considerations
+- Use const constructors for immutable widgets
+- Implement efficient list rendering with ListView.builder
+- Minimize widget rebuilds with proper state management
+- Use computation isolation for expensive operations with compute()
+- Implement pagination for large data sets
+- Cache network resources appropriately
+- Profile and optimize render performance
+
+### Code Quality
+- Use lint rules with flutter_lints package
+- Keep functions small and focused (under 30 lines)
+- Apply SOLID principles throughout the codebase
+- Use meaningful naming for classes, methods, and variables
+- Document public APIs and complex logic
+- Implement proper null safety
+- Use value objects for domain-specific types
+
+## Implementation Examples
+
+### Use Case Implementation
+```dart
+abstract class UseCase<Type, Params> {
+  Future<Either<Failure, Type>> call(Params params);
+}
+
+class GetUser implements UseCase<User, String> {
+  final UserRepository repository;
+
+  GetUser(this.repository);
+
+  @override
+  Future<Either<Failure, User>> call(String userId) async {
+    return await repository.getUser(userId);
+  }
+}
+Repository Implementation
+dart
+abstract class UserRepository {
+  Future<Either<Failure, User>> getUser(String id);
+  Future<Either<Failure, List<User>>> getUsers();
+  Future<Either<Failure, Unit>> saveUser(User user);
+}
+
+class UserRepositoryImpl implements UserRepository {
+  final UserRemoteDataSource remoteDataSource;
+  final UserLocalDataSource localDataSource;
+  final NetworkInfo networkInfo;
+
+  UserRepositoryImpl({
+    required this.remoteDataSource,
+    required this.localDataSource,
+    required this.networkInfo,
+  });
+
+  @override
+  Future<Either<Failure, User>> getUser(String id) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final remoteUser = await remoteDataSource.getUser(id);
+        await localDataSource.cacheUser(remoteUser);
+        return Right(remoteUser.toDomain());
+      } on ServerException {
+        return Left(ServerFailure());
+      }
+    } else {
+      try {
+        final localUser = await localDataSource.getLastUser();
+        return Right(localUser.toDomain());
+      } on CacheException {
+        return Left(CacheFailure());
+      }
+    }
+  }
+}
+ViewModel Implementation
+dart
+class UserViewModel extends ChangeNotifier {
+  final GetUser getUser;
+  
+  UserState _state = UserInitial();
+  UserState get state => _state;
+
+  UserViewModel({required this.getUser});
+
+  Future<void> loadUser(String userId) async {
+    _state = UserLoading();
+    notifyListeners();
+    
+    final result = await getUser(userId);
+    
+    _state = result.fold(
+      (failure) => UserError(failure),
+      (user) => UserLoaded(user),
+    );
+    notifyListeners();
+  }
+}
+
+@immutable
+abstract class UserState {
+  const UserState();
+}
+
+class UserInitial extends UserState {
+  const UserInitial();
+}
+
+class UserLoading extends UserState {
+  const UserLoading();
+}
+
+class UserLoaded extends UserState {
+  final User user;
+  const UserLoaded(this.user);
+}
+
+class UserError extends UserState {
+  final Failure failure;
+  const UserError(this.failure);
+}
+UI Implementation with Provider
+dart
+class UserPage extends StatelessWidget {
+  final String userId;
+
+  const UserPage({Key? key, required this.userId}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => UserViewModel(
+            getUser: GetUser(
+              UserRepositoryImpl(
+                remoteDataSource: UserRemoteDataSourceImpl(),
+                localDataSource: UserLocalDataSourceImpl(),
+                networkInfo: NetworkInfoImpl(),
+              ),
+            ),
+          ),
+        ),
+      ],
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('User Details'),
+          actions: [
+            Selector<UserViewModel, UserState>(
+              selector: (_, vm) => vm.state,
+              builder: (context, state, _) {
+                return IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: state is! UserLoading 
+                    ? () => context.read<UserViewModel>().loadUser(userId)
+                    : null,
+                );
+              },
+            ),
+          ],
+        ),
+        body: Selector<UserViewModel, UserState>(
+          selector: (_, vm) => vm.state,
+          builder: (context, state, _) {
+            if (state is UserInitial) {
+              return const Center(child: Text('No user data'));
+            } else if (state is UserLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (state is UserLoaded) {
+              return UserDetails(user: state.user);
+            } else if (state is UserError) {
+              return ErrorView(failure: state.failure);
+            }
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+  }
+}
+Refer to official Flutter and Provider documentation for more details.
