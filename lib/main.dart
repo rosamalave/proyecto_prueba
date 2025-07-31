@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // generado por Firebase CLI
+//import 'package:firebase_core/firebase_core.dart';
+import 'core/config/firebase_config.dart';
 import 'features/turnos/presentation/presentation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // usa el archivo generado
-  );
-  print('✅ Firebase inicializado correctamente');
+  await FirebaseConfig.initialize();
+  debugPrint('✅ Firebase inicializado correctamente');
   runApp(const MyApp());
 }
 class MyApp extends StatelessWidget {

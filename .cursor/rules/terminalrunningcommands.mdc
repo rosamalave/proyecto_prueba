@@ -1,0 +1,72 @@
+---
+description: Protocols for terminal running commands of the chat requires or needed
+alwaysApply: false
+---
+## Terminal Workflow Rules for Flutter Projects (Android Focused)
+
+### Priority Execution Flow
+1. **Device Verification First**:
+   ```bash
+   flutter devices
+Checks for connected Android devices/emulators
+
+Must show at least one Android device before proceeding
+
+Run on Android (Priority):
+
+bash
+flutter run -d android
+Only executes if Android device is connected
+
+Automatically performs implicit flutter pub get if needed
+
+Fallback Procedures
+If No Android Device:
+
+bash
+flutter build apk --debug
+Builds debug APK without requiring device
+
+Validates basic project integrity
+
+Dependency Recovery:
+
+bash
+flutter clean && flutter pub get
+Run only when:
+
+Build fails
+
+Switching branches
+
+Pubspec.yaml modified
+
+Essential Checks Table
+Condition	Command	Notes
+Android device connected	flutter run -d android	Primary development command
+No device available	flutter build apk --debug	Basic compilation check
+Dependency issues	flutter clean && flutter pub get	Clean reset
+Code validation	flutter analyze	Pre-commit check
+Strict Rule:
+Never run flutter run blindly
+
+Always verify device connection first with flutter devices
+
+If no Android devices appear:
+
+Connect physical device (USB debugging enabled)
+
+Launch Android emulator
+
+Only then use fallback build commands
+
+Recommended Workflow:
+bash
+# Step 1: Check devices
+flutter devices
+
+# If Android device appears:
+flutter run -d android
+
+# If no devices:
+flutter build apk --debug && flutter analyze
